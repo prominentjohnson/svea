@@ -151,3 +151,16 @@ a container with the priviliged run script:
 ```bash
 util/run
 ```
+
+# Git Instructions
+### Add Upstream to Your Repository
+If you forked your repository from another upstream repository and you want to keep track of the changes, you could add that repository as an upstream to yours:
+```bash
+git remote add upstream https://github.com/TUM-CPS-HN/svea.git
+```
+
+### Fetch Upstream Modification
+If the upstream repository is modified, you could fetch the corresponding modification to your forked branch:
+```bash
+git fetch upstream
+```
