@@ -44,7 +44,7 @@ For the instructions below to work, you need to first install Docker Engine.
 For Windows users, you will need to install WSL 2 and set it's distribution to
 Ubuntu (20 or higher recommended). Use the commands listed [here](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)
 to "Install", "List available Linux distributions", and "Set default WSL Version" to
-Ubuntu 20 or higher.
+Ubuntu 20 or higher. That said, we strongly recommend installing a native Linux system whenever possible, as this tends to cause fewer issues in the long run. For this course, we recommend Ubuntu 24.04, either as the sole operating system on your laptop or as part of a dual-boot setup alongside your original operating system.
 
 To install Docker Engine, follow the instructions for your operating system
 [here](https://docs.docker.com/engine/).
@@ -55,10 +55,10 @@ For example, choose the home directory or a directory for keeping projects in.
 Once you are in the chosen directory, use the command:
 
 ```bash
-git clone https://github.com/KTH-SML/svea.git
+git clone https://github.com/TUM-CPS-HN/svea.git
 ```
 
-to download the library. Then, a new directory will appear called
+to download the library. Alternatively, you may clone it using SSH, which can save you from having to enter your password each time you push changes. A tutorial is available [here](https://absprog.com/post/git-clone-with-ssh). Then, a new directory will appear called
 `./svea`. Go into the directory with command:
 
 ```bash
@@ -68,7 +68,7 @@ cd svea
 To install the Docker image containing the entire codebase run:
 
 ```bash
-util/build
+sudo util/build
 ```
 
 If it all runs without an error, you have installed the Docker image!
@@ -101,13 +101,13 @@ Start by entering into the installed Docker image by going to the root of `svea`
 and running
 
 ```bash
-util/run-dev
+util/run
 ```
 
 Then, for a simulated, pure pursuit example, call:
 
 ```bash
-ros2 launch svea_examples floor2.launch
+ros2 launch svea_examples floor2.xml
 ```
 
 Then, open Foxglove Studio natively or in the browser, and on the first prompt
