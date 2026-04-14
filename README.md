@@ -68,10 +68,15 @@ cd svea
 To install the Docker image containing the entire codebase run:
 
 ```bash
-sudo util/build
+util/build
 ```
 
-If it all runs without an error, you have installed the Docker image!
+If you run into permission denied problem, run:
+```bash
+sudo usermod -aG docker $USER 
+newgrp docker
+```
+and try again. If it all runs without an error, you have installed the Docker image!
 
 ## Installing Foxglove Studio
 For visualization, we recommend Foxglove Studio. To install Foxglove Studio,
