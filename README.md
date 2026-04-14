@@ -71,12 +71,12 @@ To install the Docker image containing the entire codebase run:
 util/build
 ```
 
-If you run into permission denied problem, run:
+If you encounter a permission denied error, it is likely due to insufficient Docker permissions. In that case, execute:
 ```bash
 sudo usermod -aG docker $USER 
 newgrp docker
 ```
-and try again. If it all runs without an error, you have installed the Docker image!
+This adds your user to the ```docker``` group and applies the change immediately. Afterward, rerun the build command. If it all runs without an error, you have installed the Docker image!
 
 ## Installing Foxglove Studio
 For visualization, we recommend Foxglove Studio. To install Foxglove Studio,
