@@ -11,6 +11,7 @@ Desktop.ini
 
 # VS Code
 .vscode/
+.codex
 
 # Python
 __pycache__/
