@@ -1,9 +1,11 @@
 #! /usr/bin/env python3
 
+import ast
 import numpy as np
 
-from geometry_msgs.msg import PoseWithCovarianceStamped
-from tf_transformations import quaternion_from_euler
+from geometry_msgs.msg import Point
+from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
+from visualization_msgs.msg import Marker
 
 from svea_core.interfaces import LocalizationInterface
 from svea_core.controllers.pure_pursuit import PurePursuitController
@@ -52,6 +54,7 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
 
     DELTA_TIME = 0.1
     TRAJ_LEN = 20
+    OBSTACLE_MARKER_TOPIC = '/marker/obstacles'
 
     points = rx.Parameter([
         '[-2.3, -7.1]',
@@ -73,6 +76,12 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
         '[-5.433333, -5.033333]',
         '[-3.866667, -6.066667]'
     ])
+    obstacle_points = rx.Parameter([
+        '[-1.2, -5.5]',
+        '[2.8, 1.2]',
+        '[7.8, 10.4]',
+    ])
+    stop_distance = rx.Parameter(1.2)
     state = rx.Parameter([-7.4, -15.3, 0.9, 0.0])  # x, y, yaw, vel
     target_velocity = rx.Parameter(0.6)
     
@@ -97,7 +106,26 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
         """
         # Convert POINTS to numerical lists if loaded as strings
         if isinstance(self.points[0], str):
-            self._points = [eval(point) for point in self.points]
+            self._points = [ast.literal_eval(point) for point in self.points]
+        else:
+            self._points = self.points
+
+        if len(self.obstacle_points) > 0 and isinstance(self.obstacle_points[0], str):
+            self._obstacle_points = [ast.literal_eval(point) for point in self.obstacle_points]
+        else:
+            self._obstacle_points = self.obstacle_points
+
+        self.obstacle_marker_pub = self.create_publisher(
+            Marker,
+            self.OBSTACLE_MARKER_TOPIC,
+            QoSProfile(
+                reliability=QoSReliabilityPolicy.RELIABLE,
+                durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+                history=QoSHistoryPolicy.KEEP_LAST,
+                depth=1,
+            ),
+        )
+        self._estop_active = False
 
         self.controller = PurePursuitController()
         self.controller.target_velocity = self.target_velocity
@@ -108,6 +136,7 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
         self.curr = 0
         self.goal = self._points[self.curr]
         self.mark.marker('goal','blue',self.goal)
+        self.publish_obstacle_markers()
         self.update_traj(x, y)
 
         self.create_timer(self.DELTA_TIME, self.loop)
@@ -128,9 +157,57 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
             self.update_goal()
             self.update_traj(x, y)
 
+        min_distance = self.get_min_obstacle_distance(x, y)
+        if min_distance <= self.stop_distance:
+            if not self._estop_active:
+                self.get_logger().warn(
+                    f"Emergency stop triggered: nearest obstacle at {min_distance:.2f} m "
+                    f"(threshold {self.stop_distance:.2f} m)"
+                )
+            self._estop_active = True
+            self.actuation.send_control(0.0, 0.0)
+            return
+
+        if self._estop_active:
+            self.get_logger().info(
+                f"Emergency stop released: nearest obstacle at {min_distance:.2f} m"
+            )
+        self._estop_active = False
         steering, velocity = self.controller.compute_control(state)
         self.get_logger().info(f"Steering: {steering}, Velocity: {velocity}")
         self.actuation.send_control(steering, velocity)
+
+    def publish_obstacle_markers(self):
+        marker = Marker()
+        marker.header.frame_id = 'map'
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = 'pure_pursuit_obstacles'
+        marker.id = 0
+        marker.type = Marker.SPHERE_LIST
+        marker.action = Marker.ADD
+        marker.scale.x = 0.8
+        marker.scale.y = 0.8
+        marker.scale.z = 0.8
+        marker.color.r = 1.0
+        marker.color.g = 0.2
+        marker.color.b = 0.2
+        marker.color.a = 1.0
+        marker.pose.orientation.w = 1.0
+        marker.points = [
+            Point(x=float(x), y=float(y), z=0.4)
+            for x, y in self._obstacle_points
+        ]
+        self.obstacle_marker_pub.publish(marker)
+
+    def get_min_obstacle_distance(self, x, y):
+        if len(self._obstacle_points) == 0:
+            return np.inf
+
+        distances = [
+            np.hypot(float(obstacle_x) - x, float(obstacle_y) - y)
+            for obstacle_x, obstacle_y in self._obstacle_points
+        ]
+        return min(distances)
 
     def update_goal(self):
         """
