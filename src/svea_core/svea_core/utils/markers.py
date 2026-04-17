@@ -9,7 +9,7 @@ from builtin_interfaces.msg import Duration
 
 qos_pubber = QoSProfile(
     reliability=QoSReliabilityPolicy.RELIABLE,
-    durability=QoSDurabilityPolicy.VOLATILE,
+    durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
     history=QoSHistoryPolicy.KEEP_LAST,
     depth=1,
 )
@@ -17,10 +17,12 @@ qos_pubber = QoSProfile(
 
 class PlaceMarker(rx.Field):
     def __init__(self, **kwds) -> None:
+        super().__init__()
         if namespace := kwds.get('name_space', None):
             self.ns = kwds.get('name_space', None)
         else:
             self.ns = None
+        self._publishers = {}
     
     def on_startup(self):
         return self
@@ -28,12 +30,19 @@ class PlaceMarker(rx.Field):
     def marker(self, name:str, color, position, orientation = [0.0, 0.0, 0.0, 0.0], shape = Marker.SPHERE, **kwds):
 
         topic_name = '/marker/' + name
-        mark_pub = self.node.create_publisher(Marker, topic_name, qos_pubber)
+        if topic_name not in self._publishers:
+            self._publishers[topic_name] = self.node.create_publisher(Marker, topic_name, qos_pubber)
+        mark_pub = self._publishers[topic_name]
 
         marker = Marker()
         
         marker.header.frame_id = "map"  
         marker.header.stamp = self.node.get_clock().now().to_msg()
+        if self.ns is not None:
+            marker.ns = self.ns
+        else:
+            marker.ns = name
+        marker.id = 0
         
         marker.type = shape      
         marker.action = Marker.ADD     
