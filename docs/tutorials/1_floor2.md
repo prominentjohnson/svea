@@ -63,7 +63,7 @@ class PurePursuitController:
 
 ## Task 1: Addressing Overshoot
 
-When you run the Floor 2 example as is, you will notice that at some turns the vehicle has a big overshoot and some times gets very close, or even intersects, with a wall. Since we will run this example on the real SVEA at then end of the tutorial, this overshoot is unacceptable, as the real SVEA might actually drive into a wall. Your first task will be to address this overshoot and avoid colliding with any walls.
+When you run the Floor 2 example as is, you will notice that at some turns the vehicle has a big overshoot and some times gets very close, or even intersects, with a wall. Since we will run this example on the real SVEA at the end of the tutorial, this overshoot is unacceptable, as the real SVEA might actually drive into a wall. Your first task will be to address this overshoot and avoid colliding with any walls.
 
 Since this is the first issue you are looking into, instead of starting with the implementation right away, you should start by reading into how the software driving this example is set up (pun intended). The best place to start is to inspect the PurePursuitController class definition that is imported in pure_pursuit.py. You can find the pure-pursuit controller class definition in:
 
