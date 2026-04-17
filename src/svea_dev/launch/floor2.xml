@@ -7,7 +7,7 @@
     <arg name="initial_pose_y" default="-15.383940368977647"/>
     <arg name="initial_pose_a" default="1.0116"/>
     <arg name="state" default="[-7.4, -15.3, 0.9, 0.0]"/>
-    <arg name="points" default="['[-2.3, -7.1]', '[10.5, 11.7]', '[5.7, 15.0]', '[-7.0, -4.0]']"/>
+    <!-- <arg name="points" default="['[-2.3, -7.1]', '[10.5, 11.7]', '[5.7, 15.0]', '[-7.0, -4.0]']"/> -->
 
     <include file="$(find-pkg-share svea_core)/launch/map_and_foxglove.xml">
         <arg name="map" value="$(var map)"/>
@@ -27,6 +27,6 @@
         <param name="use_rviz" value="$(var use_foxglove)"/>
         <param name="is_sim" value="$(var is_sim)"/>
         <param name="state" value="$(var state)" />
-        <param name="points" value="$(var points)" />
+        <!-- <param name="points" value="$(var points)" /> -->
     </node>
 </launch>
