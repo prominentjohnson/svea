@@ -87,9 +87,9 @@ If this is "too easy" for you, then consider the following enhancements:
 
 ## Task 3: Park the Vehicle
 
-Currently, the vehicle will continuously goes around the paths until you halt
+Currently, the vehicle will continuously go around the paths until you halt
 the launch or if the vehicle encounters an obstacle (if you completed the previous task).
-In this taks, we'd like you to give the vehicle the ability to stop at a desginated
+In this task, we'd like you to give the vehicle the ability to stop at a desginated
 location, what we will refer to as a "parking spot".
 
 We recommend you start by adding a point in the trajectory where, if the vehicle
