@@ -11,7 +11,7 @@ judge. Ultimately, this tutorial is designed for you to start getting your hands
 dirty with your own automated driving system.
 
 If you haven't already, please checkout the [installation instructions](https://github.com/KTH-SML/svea/blob/main/README.md#installation).
-Then, enter into a Docker container by calling with the `util/run-dev` script.
+Then, enter into a Docker container by calling with the `util/run` script.
 
 ## Prerequisites
 
@@ -29,7 +29,7 @@ with this tutorial. Check this by running the following without any errors:
 ros2 launch svea_examples floor2.xml is_sim:=true
 ```
 
-Before you get started with implementing improvements to the Floor 2 example, you should first create your own version of the example that you can edit. You can do this by copying `svea_examples/launch/floor2.launch` into `<your project package>/launch/floor2.launch` and `svea_examples/scripts/pure_pursuit.py` into `<your project package>/scripts/`.
+Before you start implementing improvements to the Floor 2 example, you should first create your own editable copy of it. You can do this by running the `ros2 pkg create ...` command. As a template, copy `svea_examples/launch/floor2.xml` to `<your_project_package>/launch/floor2.xml` and `svea_examples/scripts/pure_pursuit.py` to `<your_project_package>/scripts/`.
 
 ## Understanding the Pure Pursuit Implementation
 
