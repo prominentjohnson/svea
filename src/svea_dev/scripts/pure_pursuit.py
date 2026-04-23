@@ -86,6 +86,8 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
     parking_approach_distance = rx.Parameter(1.5)
     parking_distance_tolerance = rx.Parameter(0.35)
     parking_angle_tolerance = rx.Parameter(0.35)
+    parking_forward_velocity = rx.Parameter(0.35)
+    parking_reverse_velocity = rx.Parameter(-0.2)
     state = rx.Parameter([-7.4, -15.3, 0.9, 0.0])  # x, y, yaw, vel
     target_velocity = rx.Parameter(0.6)
     
@@ -138,6 +140,9 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
         self._parking_mode = False
         self._parked = False
         self._parking_logged = False
+        self._parking_waypoints = []
+        self._parking_index = 0
+        self._parking_reverse_start = 0
 
         self.controller = PurePursuitController()
         self.controller.target_velocity = self.target_velocity
@@ -149,6 +154,13 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
         self.goal = self._points[self.curr]
         self.mark.marker('goal','blue',self.goal)
         self.mark.marker('parking_spot', 'green', self._parking_spot[:2] + [0.2])
+        self.mark.marker(
+            'parking_heading',
+            'green',
+            [self._parking_spot[0], self._parking_spot[1], 0.35],
+            orientation=[0.0, 0.0, self._parking_spot[2]],
+            shape=Marker.ARROW,
+        )
         self.publish_obstacle_markers()
         self.update_traj(x, y)
 
@@ -172,10 +184,13 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
 
         if self.controller.is_finished:
             if self._parking_mode:
-                self.controller.is_finished = False
+                self.advance_parking_goal(x, y)
             else:
-                self.update_goal()
-                self.update_traj(x, y)
+                if self.curr < len(self._points) - 1:
+                    self.update_goal()
+                    self.update_traj(x, y)
+                else:
+                    self.start_parking(x, y)
 
         min_distance = self.get_min_obstacle_distance(x, y)
         if min_distance <= self.stop_distance:
@@ -204,6 +219,11 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
             return
 
         steering, velocity = self.controller.compute_control(state)
+        if self._parking_mode:
+            if self._parking_index < self._parking_reverse_start:
+                velocity = min(velocity, self.parking_forward_velocity)
+            else:
+                velocity = self.parking_reverse_velocity
         self.get_logger().info(f"Steering: {steering}, Velocity: {velocity}")
         self.actuation.send_control(steering, velocity)
 
@@ -245,12 +265,8 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
         is reached, it wraps around to the beginning. The current index is
         incremented, and the goal marker is updated.
         """
-        if self.curr < len(self._points) - 1:
-            self.curr += 1
-            self.goal = self._points[self.curr]
-        else:
-            self.start_parking()
-            return
+        self.curr += 1
+        self.goal = self._points[self.curr]
 
         self.controller.is_finished = False
         # Mark the goal
@@ -269,30 +285,34 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
         self.controller.traj_y = ys
         #self.path.publish_path(xs,ys)
 
-    def start_parking(self):
+    def start_parking(self, x, y):
         self._parking_mode = True
         px, py, pyaw = self._parking_spot
-        ax = px - self.parking_approach_distance * np.cos(pyaw)
-        ay = py - self.parking_approach_distance * np.sin(pyaw)
+        # Use a short sequence of waypoints on the parking heading line:
+        # line up in front of the spot, move forward a little more twice,
+        # then reverse straight into the final parking point.
+        front_far_x = px + 2 * self.parking_approach_distance * np.cos(pyaw)
+        front_far_y = py + 2 * self.parking_approach_distance * np.sin(pyaw)
+        front_mid_x = px + self.parking_approach_distance * np.cos(pyaw)
+        front_mid_y = py + self.parking_approach_distance * np.sin(pyaw)
+        front_near_x = px + 0.5 * self.parking_approach_distance * np.cos(pyaw)
+        front_near_y = py + 0.5 * self.parking_approach_distance * np.sin(pyaw)
 
-        first_leg = max(2, self.TRAJ_LEN // 2)
-        second_leg = self.TRAJ_LEN - first_leg + 1
-        xs = np.concatenate([
-            np.linspace(self.goal[0], ax, first_leg, endpoint=False),
-            np.linspace(ax, px, second_leg),
-        ])
-        ys = np.concatenate([
-            np.linspace(self.goal[1], ay, first_leg, endpoint=False),
-            np.linspace(ay, py, second_leg),
-        ])
-
-        self.goal = [px, py]
-        self.controller.traj_x = xs
-        self.controller.traj_y = ys
+        self._parking_waypoints = [
+            [float(front_mid_x), float(front_mid_y)],
+            [float(front_far_x), float(front_far_y)],
+            [float(front_near_x), float(front_near_y)],
+            [float(px), float(py)],
+        ]
+        self._parking_index = 0
+        self._parking_reverse_start = 2
+        self.goal = self._parking_waypoints[self._parking_index]
         self.controller.is_finished = False
+        self.controller.target_velocity = self.parking_forward_velocity
         self.mark.marker('goal', 'blue', self.goal)
+        self.update_traj(x, y)
         self.get_logger().info(
-            f"Switching to parking trajectory toward ({px:.2f}, {py:.2f}, yaw={pyaw:.2f})"
+            f"Switching to parking maneuver toward ({px:.2f}, {py:.2f}, yaw={pyaw:.2f})"
         )
 
     def is_at_parking_spot(self, x, y, yaw):
@@ -307,6 +327,21 @@ class pure_pursuit(rx.Node):  # Inherit from rx.Node
     @staticmethod
     def wrap_angle(angle):
         return (angle + np.pi) % (2 * np.pi) - np.pi
+
+    def advance_parking_goal(self, x, y):
+        if self._parking_index >= len(self._parking_waypoints) - 1:
+            self.controller.is_finished = False
+            return
+
+        self._parking_index += 1
+        self.goal = self._parking_waypoints[self._parking_index]
+        self.controller.is_finished = False
+        if self._parking_index >= self._parking_reverse_start:
+            self.controller.target_velocity = self.parking_reverse_velocity
+        else:
+            self.controller.target_velocity = self.parking_forward_velocity
+        self.mark.marker('goal', 'blue', self.goal)
+        self.update_traj(x, y)
 
 if __name__ == '__main__':
     pure_pursuit.main()
