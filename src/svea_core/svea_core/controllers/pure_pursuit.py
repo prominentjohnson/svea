@@ -35,7 +35,6 @@ class PurePursuitController:
     max_velocity = 1.0  # [m/s] maximum velocity output
     min_velocity = -1.0  # [m/s] minimum velocity output (for reverse)
     integral_limit = 10.0  # maximum integral error accumulation
-
     L = 0.324  # [m] wheel base of vehicle
 
     def __init__(self, dt=0.01):
