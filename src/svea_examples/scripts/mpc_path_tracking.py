@@ -29,7 +29,6 @@ qos_pubber = QoSProfile(
 )
 
 class mpc_path_tracking(rx.Node):
-    is_sim = rx.Parameter(True)
     state = rx.Parameter([-3.0, 0.0, 0.0, 0.0])  # x, y, yaw, velocity
     mpc_freq = rx.Parameter(10)  # Hz
     svea_mocap_name = rx.Parameter('svea7')
@@ -78,7 +77,8 @@ class mpc_path_tracking(rx.Node):
             "svea0": 28,
             "svea7": 7
         }
-        if self.is_sim is False:
+        is_sim = self.get_parameter('is_sim').value
+        if is_sim is False:
             svea_name = self.SVEA_MOCAP_NAME.lower()  # Ensure case-insensitivity  
             unitless_steering = self.unitless_steering_map.get(svea_name, 0)  # Default to 0 if not found
             PERC_TO_LLI_COEFF = 1.27
