@@ -28,7 +28,6 @@ qos_pubber = QoSProfile(
 )
 
 class mpc(rx.Node):
-    is_sim = rx.Parameter(True)
     state = rx.Parameter([-3.0, 0.0, 0.0, 0.0])  # x, y, yaw, velocity
     mpc_freq = rx.Parameter(10)  # Hz
     delta_s = rx.Parameter(5)  # m
@@ -97,7 +96,8 @@ class mpc(rx.Node):
 
         self.create_timer(self.DELTA_TIME, self.loop)
 
-        if not self.is_sim:
+        is_sim = self.get_parameter('is_sim').value
+        if not is_sim:
             svea_name = self.SVEA_MOCAP_NAME.lower()  # Ensure case-insensitivity  
             unitless_steering = self.unitless_steering_map.get(svea_name, 0)  # Default to 0 if not found
             PERC_TO_LLI_COEFF = 1.27
