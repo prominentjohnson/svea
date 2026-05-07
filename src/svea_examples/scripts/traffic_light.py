@@ -4,7 +4,7 @@
 import random
 
 from rclpy.clock import Clock, Duration
-from std_msgs.msg import String, Float32
+from std_msgs.msg import String, Float32, Empty
 
 from svea_core import rosonic as rx
 from svea_core.utils import PlaceMarker
@@ -32,6 +32,8 @@ class traffic_light(rx.Node):
 
     pos_x = rx.Parameter(0.0)
     pos_y = rx.Parameter(0.0)
+    wait_for_start = rx.Parameter(False)
+    start_topic = rx.Parameter('/planned_trajectory/start')
 
     ## Publishers
 
@@ -48,8 +50,23 @@ class traffic_light(rx.Node):
 
         assert 0 <= self.alpha <= min(self.RED_TIME, self.GREEN_TIME)
 
+        self._running = not self.wait_for_start
         self.switch('Rd')  # initial state is red
+        if self.wait_for_start:
+            self._start_sub = self.create_subscription(
+                Empty,
+                self.start_topic,
+                self.start_callback,
+                1,
+            )
         self._loop_tmr = self.create_timer(1.0 / self.rate, self.loop)
+
+    def start_callback(self, _msg):
+        if self._running:
+            return
+        self._running = True
+        self.switch('Rd')
+        self.get_logger().info('Traffic light cycle started')
     
     def loop(self):
 
@@ -59,8 +76,12 @@ class traffic_light(rx.Node):
         time_left = (self._time0 + self._delta - now).nanoseconds / 1e9
         
         # if time has elapsed, then switch to next state
-        if time_left <= 0:
+        if self._running and time_left <= 0:
             self.switch()
+            now = Clock().now()
+            time_left = (self._time0 + self._delta - now).nanoseconds / 1e9
+        elif not self._running:
+            time_left = self.RED_TIME
 
         # publish current state and time remaining
         msg = String()

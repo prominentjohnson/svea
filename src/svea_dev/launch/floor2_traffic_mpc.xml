@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="map" default="floor2"/>
+    <arg name="is_sim" default="true"/>
+    <arg name="use_foxglove" default="true"/>
+
+    <arg name="initial_pose_x" default="-7.3699"/>
+    <arg name="initial_pose_y" default="-15.383940368977647"/>
+    <arg name="initial_pose_a" default="1.0116"/>
+    <arg name="state" default="[-7.4, -15.3, 0.9, 0.0]"/>
+
+    <arg name="start_x" default="-7.4"/>
+    <arg name="start_y" default="-15.3"/>
+    <arg name="goal_x" default="10.5"/>
+    <arg name="goal_y" default="11.7"/>
+    <arg name="light_position" default="0.6"/>
+    <arg name="light_position_is_ratio" default="true"/>
+    <arg name="light_x" default="3.34"/>
+    <arg name="light_y" default="0.90"/>
+
+    <include file="$(find-pkg-share svea_core)/launch/map_and_foxglove.xml">
+        <arg name="map" value="$(var map)"/>
+        <arg name="use_foxglove" value="$(var use_foxglove)"/>
+    </include>
+
+    <include file="$(find-pkg-share svea_core)/launch/svea_launch.xml">
+        <arg name="is_sim" value="$(var is_sim)"/>
+        <arg name="initial_pose_x" value="$(var initial_pose_x)"/>
+        <arg name="initial_pose_y" value="$(var initial_pose_y)"/>
+        <arg name="initial_pose_a" value="$(var initial_pose_a)"/>
+        <arg name="state" value="$(var state)"/>
+        <arg name="map" value="$(var map)"/>
+    </include>
+
+    <node name="light_a" pkg="svea_examples" exec="traffic_light.py" output="screen">
+        <param name="alpha" value="0.0"/>
+        <param name="pos_x" value="$(var light_x)"/>
+        <param name="pos_y" value="$(var light_y)"/>
+    </node>
+
+    <node name="planning_traffic_light" pkg="svea_dev" exec="planning_traffic_light.py" output="screen">
+        <param name="start_x" value="$(var start_x)"/>
+        <param name="start_y" value="$(var start_y)"/>
+        <param name="goal_x" value="$(var goal_x)"/>
+        <param name="goal_y" value="$(var goal_y)"/>
+        <param name="light_position" value="$(var light_position)"/>
+        <param name="light_position_is_ratio" value="$(var light_position_is_ratio)"/>
+        <param name="num_steps" value="50"/>
+        <param name="candidate_stride" value="5"/>
+        <param name="max_final_time" value="45.0"/>
+        <param name="velocity_max" value="1.2"/>
+        <param name="acceleration_min" value="-0.6"/>
+        <param name="acceleration_max" value="0.6"/>
+        <param name="green_entry_margin" value="1.0"/>
+        <param name="green_exit_margin" value="0.5"/>
+        <param name="time_weight" value="0.2"/>
+        <param name="energy_weight" value="1.0"/>
+        <param name="jerk_weight" value="0.2"/>
+        <param name="output_dir" value="/svea_ws/traffic_plots"/>
+        <param name="speed_plot_x" value="-7.4"/>
+        <param name="speed_plot_y" value="-18.0"/>
+        <param name="speed_plot_time_scale" value="0.25"/>
+        <param name="speed_plot_speed_scale" value="2.0"/>
+    </node>
+
+    <node name="mpc_traffic_tracker" pkg="svea_dev" exec="mpc_traffic_tracker.py" output="screen">
+        <param name="is_sim" value="$(var is_sim)"/>
+        <param name="mpc_freq" value="10.0"/>
+        <param name="trajectory_topic" value="/planned_trajectory/data"/>
+        <param name="traffic_state_topic" value="/light_a/state"/>
+        <param name="traffic_time_left_topic" value="/light_a/time_left"/>
+        <param name="sync_with_traffic_light" value="true"/>
+        <param name="sync_state" value="Rd"/>
+        <param name="sync_state_duration" value="5.0"/>
+        <param name="sync_tolerance" value="0.3"/>
+        <param from="$(find-pkg-share svea_core)/params/mpc_default_path_tracking.yaml"/>
+    </node>
+</launch>
