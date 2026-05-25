@@ -73,13 +73,15 @@ class LocalizationInterface(rx.Field):
         self,
         odom: Odometry,
         pose_target: str = "map",
-        twist_target: str = "base_link",
+        twist_target: Optional[str] = None,
         timeout_s: float = 0.2,
     ) -> Odometry:
         """
         Transform an Odometry message so that:
           - pose is expressed in `pose_target` (default: 'map')
-          - twist is expressed in `twist_target` (default: 'base_link')
+          - twist is expressed in `twist_target`; by default this is the
+            node-local base_link frame, e.g. '/vehicle1/base_link' in a
+            namespace and 'base_link' at the root.
 
         By spec:
           - pose source frame  = odom.header.frame_id
@@ -91,6 +93,9 @@ class LocalizationInterface(rx.Field):
         # ---- Source frames from the incoming message ----
         pose_source  = odom.header.frame_id or ""
         twist_source = odom.child_frame_id or pose_source or ""
+        if twist_target is None:
+            namespace = self.node.get_namespace().rstrip("/")
+            twist_target = f"{namespace}/base_link" if namespace else "base_link"
 
         stamp = Time()
         timeout = Duration(seconds=timeout_s)
