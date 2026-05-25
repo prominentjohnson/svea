@@ -6,6 +6,7 @@ import math
 import numpy as np
 from nav_msgs.msg import Odometry
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy, QoSReliabilityPolicy
+from std_msgs.msg import String
 
 from svea_core import rosonic as rx
 from svea_core.controllers.pure_pursuit import PurePursuitController
@@ -58,6 +59,12 @@ class acc_follower(rx.Node):
     max_accel = rx.Parameter(0.4)
     max_decel = rx.Parameter(0.8)
     leader_timeout = rx.Parameter(1.0)
+    traffic_state_topic = rx.Parameter('/light_a/state')
+    light_x = rx.Parameter(3.34)
+    light_y = rx.Parameter(0.90)
+    stop_offset = rx.Parameter(0.7)
+    slowdown_distance = rx.Parameter(2.0)
+    stop_states = rx.Parameter(['Rd', 'YR'])
 
     actuation = ActuationInterface()
     localizer = LocalizationInterface()
@@ -78,6 +85,7 @@ class acc_follower(rx.Node):
 
         self.leader_state = None
         self.leader_last_time = None
+        self.light_state = None
         self.last_velocity_cmd = 0.0
         self.curr = 0
 
@@ -95,12 +103,23 @@ class acc_follower(rx.Node):
             self.leader_odom_callback,
             qos_profile,
         )
+        self.light_s = self.project_to_path_s((self.light_x, self.light_y))
+        self.stop_s = (self.light_s - self.stop_offset) % self.path_length
+        self.create_subscription(
+            String,
+            self.traffic_state_topic,
+            self.traffic_state_callback,
+            1,
+        )
         self.create_timer(self.DELTA_TIME, self.loop)
         self.get_logger().info(f"ACC follower subscribed to leader topic: {self.leader_odom_topic}")
 
     def leader_odom_callback(self, msg):
         self.leader_state = self.odom_to_state(msg)
         self.leader_last_time = self.get_clock().now()
+
+    def traffic_state_callback(self, msg):
+        self.light_state = msg.data
 
     def loop(self):
         ego_state = self.localizer.get_state()
@@ -111,7 +130,10 @@ class acc_follower(rx.Node):
             self.update_traj(x, y)
 
         steering = self.controller.compute_steering(ego_state)
-        velocity = self.compute_acc_velocity(ego_state)
+        acc_velocity = self.compute_acc_velocity(ego_state)
+        traffic_velocity = self.compute_traffic_light_velocity_limit(ego_state)
+        velocity = min(acc_velocity, traffic_velocity)
+        self.last_velocity_cmd = velocity
         self.actuation.send_control(steering, velocity)
 
     def compute_acc_velocity(self, ego_state):
@@ -136,6 +158,23 @@ class acc_follower(rx.Node):
         target_speed = self.last_velocity_cmd + acceleration_cmd * self.DELTA_TIME
         target_speed = self.clip(target_speed, 0.0, self.max_velocity)
         return self.rate_limit_velocity(target_speed)
+
+    def compute_traffic_light_velocity_limit(self, ego_state):
+        if self.light_state not in self.stop_states:
+            return self.max_velocity
+
+        ego_s = self.project_to_path_s((ego_state[0], ego_state[1]))
+        distance_to_stop = self.stop_s - ego_s
+        if distance_to_stop < 0.0:
+            distance_to_stop += self.path_length
+
+        if distance_to_stop > self.slowdown_distance:
+            return self.max_velocity
+
+        if distance_to_stop <= 0.15:
+            return 0.0
+
+        return self.max_velocity * distance_to_stop / self.slowdown_distance
 
     def compute_path_gap(self, ego_xy, leader_xy):
         ego_s = self.project_to_path_s(ego_xy)
