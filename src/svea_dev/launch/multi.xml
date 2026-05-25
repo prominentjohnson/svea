@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- Launch file arguments -->
+    <arg name="map"             default="floor2"/>
+    <arg name="is_sim"          default="true"/>
+    <arg name="use_foxglove"    default="true"/>
+    <arg name="initial_pose_x"  default="-2.65488696"/>
+    <arg name="initial_pose_y"  default="-1.64422277"/>
+    <arg name="initial_pose_a"  default="1.57" />
+    <arg name="state1" default="[-7.4, -15.3, 0.9, 0.0]" />
+    <arg name="state2" default="[-4.8, -11.4, 1.03, 0.0]" />
+    <arg name="points" default="['[-2.3, -7.1]', '[-0.166667, -3.966667]', '[1.966667, -0.833333]', '[4.1, 2.3]', '[6.233333, 5.433333]', '[8.366667, 8.566667]', '[10.5, 11.7]', '[8.9, 12.8]', '[7.3, 13.9]', '[5.7, 15.0]', '[3.583333, 11.833333]', '[1.466667, 8.666667]', '[-0.65, 5.5]', '[-2.766667, 2.333333]', '[-4.883333, -0.833333]', '[-7.0, -4.0]', '[-5.433333, -5.033333]', '[-3.866667, -6.066667]']" />
+    <arg name="vehicle1_name" default="vehicle1"/>
+    <arg name="vehicle2_name" default="vehicle2"/>
+
+    <!-- Shared map and Foxglove bridge -->
+    <include file="$(find-pkg-share svea_core)/launch/map_and_foxglove.xml">
+        <arg name="map" value="$(var map)" />
+        <arg name="use_foxglove" value="$(var use_foxglove)" />
+    </include>
+
+    <!-- Vehicle 1: leader, currently follows the waypoint path normally. -->
+    <group>
+        <push_ros_namespace namespace="$(var vehicle1_name)" />
+
+        <include file="$(find-pkg-share svea_core)/launch/svea_launch.xml">
+            <arg name="map" value="$(var map)" />
+            <arg name="is_sim" value="$(var is_sim)" />
+            <arg name="initial_pose_x" value="$(var initial_pose_x)" />
+            <arg name="initial_pose_y" value="$(var initial_pose_y)" />
+            <arg name="initial_pose_a" value="$(var initial_pose_a)" />
+            <arg name="state" value="$(var state1)" />
+            <arg name="vehicle_name" value="$(var vehicle1_name)" />
+        </include>
+
+        <node name="pure_pursuit" pkg="svea_examples" exec="pure_pursuit.py" namespace="" output="screen">
+            <param name="use_rviz" value="$(var use_foxglove)"/>
+            <param name="is_sim" value="$(var is_sim)"/>
+            <param name="state" value="$(var state1)" />
+            <param name="points" value="$(var points)" />
+        </node>
+    </group>
+
+    <!-- Vehicle 2: follower, tracks the path and adapts speed to vehicle 1. -->
+    <group>
+        <push_ros_namespace namespace="$(var vehicle2_name)" />
+
+        <include file="$(find-pkg-share svea_core)/launch/svea_launch.xml">
+            <arg name="map" value="$(var map)" />
+            <arg name="is_sim" value="$(var is_sim)" />
+            <arg name="initial_pose_x" value="$(var initial_pose_x)" />
+            <arg name="initial_pose_y" value="$(var initial_pose_y)" />
+            <arg name="initial_pose_a" value="$(var initial_pose_a)" />
+            <arg name="state" value="$(var state2)" />
+            <arg name="vehicle_name" value="$(var vehicle2_name)" />
+        </include>
+
+        <node name="acc_follower" pkg="svea_dev" exec="acc_follower.py" namespace="" output="screen">
+            <param name="use_rviz" value="$(var use_foxglove)"/>
+            <param name="is_sim" value="$(var is_sim)"/>
+            <param name="state" value="$(var state2)" />
+            <param name="points" value="$(var points)" />
+            <param name="leader_odom_topic" value="/$(var vehicle1_name)/odometry/local" />
+            <param name="target_velocity" value="0.6" />
+            <param name="max_velocity" value="1.0" />
+            <param name="min_gap" value="0.8" />
+            <param name="time_headway" value="1.2" />
+            <param name="gap_gain" value="0.35" />
+            <param name="relative_speed_gain" value="0.6" />
+            <param name="cruise_gain" value="0.1" />
+            <param name="max_accel" value="0.4" />
+            <param name="max_decel" value="0.8" />
+            <param name="leader_timeout" value="1.0" />
+        </node>
+    </group>
+</launch>
